@@ -1,0 +1,122 @@
+services:
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "${LAN_IP}:81:81"
+
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+
+    networks:
+      - app-network
+
+
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: ${NEXTCLOUD_DB_NAME}
+      MYSQL_USER: ${NEXTCLOUD_DB_USER}
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+    networks:
+      - app-network
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+
+    networks:
+      - app-network
+
+
+  nextcloud:
+    image: nextcloud:apache
+    container_name: nextcloud
+    restart: unless-stopped
+
+    ports:
+      - "${LAN_IP}:8080:80"
+
+    environment:
+      MYSQL_HOST: mariadb
+      MYSQL_DATABASE: ${NEXTCLOUD_DB_NAME}
+      MYSQL_USER: ${NEXTCLOUD_DB_USER}
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      REDIS_HOST: redis
+
+    volumes:
+      - nextcloud_html:/var/www/html
+      - /srv/example/nextcloud-data:/var/www/html/data
+
+    depends_on:
+      - mariadb
+      - redis
+
+    networks:
+      - app-network
+
+
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice
+    restart: unless-stopped
+
+    ports:
+      - "${LAN_IP}:8081:80"
+
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET}
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+
+    networks:
+      - app-network
+
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+
+    ports:
+      - "${LAN_IP}:8096:8096"
+
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      - /srv/example/media:/media:ro
+
+    networks:
+      - app-network
+
+
+networks:
+
+  app-network:
+    driver: bridge
+
+
+volumes:
+
+  npm_data:
+  npm_letsencrypt:
+  mariadb_data:
+  nextcloud_html:
+  jellyfin_config:
+  jellyfin_cache:
