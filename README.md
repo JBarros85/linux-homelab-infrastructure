@@ -1,5 +1,67 @@
 # Linux Homelab Infrastructure
 
+<!-- PORTFOLIO_OVERVIEW_START -->
+
+## Project Overview
+
+This project documents the design, administration and security of a self-hosted Linux homelab used for hands-on learning in systems administration, networking, infrastructure and cybersecurity.
+
+### What this project demonstrates
+
+- Linux server administration
+- TCP/IP networking and secure remote access
+- WireGuard VPN
+- UFW firewall configuration
+- Docker and Docker Compose
+- Reverse proxy architecture
+- Service isolation and private databases
+- RAID1 storage management
+- Borg backup strategy
+- SMART disk monitoring
+- Infrastructure documentation
+- Git and GitHub workflow
+
+## Architecture at a Glance
+
+```mermaid
+flowchart LR
+    Internet((Internet))
+    Router["Router / Firewall"]
+    VPN["WireGuard VPN"]
+    Proxy["Nginx Proxy Manager"]
+    LAN["Private LAN"]
+    Docker["Docker Services"]
+    RAID["RAID1 Storage"]
+    Backup["Borg Backup"]
+
+    Internet --> Router
+    Router --> VPN
+    Router --> Proxy
+    VPN --> LAN
+    Proxy --> Docker
+    LAN --> Docker
+    Docker --> RAID
+    RAID --> Backup
+```
+
+For the complete architecture diagram, see:
+
+[Homelab Architecture Diagram](diagrams/homelab-architecture.md)
+
+## Documentation
+
+| Topic | Documentation |
+|---|---|
+| Architecture | [Architecture](docs/architecture.md) |
+| Security | [Security Architecture](docs/security.md) |
+| Networking | [Networking](docs/networking.md) |
+| Storage | [Storage Architecture](docs/storage.md) |
+| Backup | [Backup Strategy](docs/backup-strategy.md) |
+| Maintenance | [Maintenance Checklist](docs/maintenance-checklist.md) |
+
+<!-- PORTFOLIO_OVERVIEW_END -->
+
+
 A self-hosted Linux infrastructure project built to develop practical experience in Linux administration, networking, cybersecurity, Docker, storage, backup, monitoring and self-hosted services.
 
 ## Overview
