@@ -383,3 +383,49 @@ This project provides practical experience with:
 **Active**
 
 This homelab is continuously improved as part of my Computer Engineering studies and my practical development in Linux, networking and cybersecurity.
+
+<!-- HEALTH_CHECK_START -->
+
+## Automation
+
+### Homelab Health Check
+
+The repository includes a read-only Bash health-check utility for routine infrastructure assessment:
+
+[`scripts/homelab-health-check.sh`](scripts/homelab-health-check.sh)
+
+The script checks:
+
+- Docker daemon and container health
+- Failed systemd units
+- Filesystem capacity
+- Memory utilisation
+- Linux software RAID status
+- WireGuard state
+- UFW firewall status
+- Optional Borg repository availability
+- Host uptime
+
+It is designed to collect diagnostic information without restarting services or modifying system configuration.
+
+Run:
+
+```bash
+./scripts/homelab-health-check.sh
+```
+
+Optional Borg validation:
+
+```bash
+BORG_REPO=/path/to/repository ./scripts/homelab-health-check.sh
+```
+
+Exit status:
+
+| Code | Meaning |
+|---|---|
+| `0` | Healthy |
+| `1` | Warning detected |
+| `2` | Failure detected |
+
+<!-- HEALTH_CHECK_END -->
