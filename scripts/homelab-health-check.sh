@@ -353,11 +353,7 @@ check_memory() {
         return
     fi
 
-    used_pct=$(
-        (
-            (total_kb - available_kb) * 100
-        ) / total_kb
-    )
+    used_pct=$(( (total_kb - available_kb) * 100 / total_kb ))
 
     if (( used_pct >= MEM_CRIT_PCT )); then
         fail "Memory utilisation is ${used_pct}%."
