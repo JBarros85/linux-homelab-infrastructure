@@ -1,0 +1,64 @@
+name: Bash Validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/**/*.sh"
+      - ".github/workflows/bash-validation.yml"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/**/*.sh"
+      - ".github/workflows/bash-validation.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bash-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Bash Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find Bash scripts
+        run: |
+          find scripts -type f -name "*.sh" -print
+
+      - name: Validate Bash syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r -d '' script; do
+            echo "Checking syntax: $script"
+            bash -n "$script"
+          done < <(find scripts -type f -name "*.sh" -print0)
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r -d '' script; do
+            echo "Running ShellCheck: $script"
+            shellcheck "$script"
+          done < <(find scripts -type f -name "*.sh" -print0)

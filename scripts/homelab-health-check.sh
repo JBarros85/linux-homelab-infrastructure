@@ -277,18 +277,15 @@ check_filesystems() {
     local disk_issues=0
     local checked=0
     local filesystem
-    local blocks
-    local used
-    local available
     local percentage
     local mountpoint
     local value
 
     while read -r \
         filesystem \
-        blocks \
-        used \
-        available \
+        _ \
+        _ \
+        _ \
         percentage \
         mountpoint
     do
