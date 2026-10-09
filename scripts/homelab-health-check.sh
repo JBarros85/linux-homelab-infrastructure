@@ -20,7 +20,7 @@
 set -uo pipefail
 
 readonly SCRIPT_NAME="homelab-health-check"
-readonly VERSION="1.0.0"
+readonly VERSION="1.1.0"
 
 DISK_WARN_PCT="${DISK_WARN_PCT:-85}"
 DISK_CRIT_PCT="${DISK_CRIT_PCT:-95}"
@@ -29,9 +29,13 @@ MEM_CRIT_PCT="${MEM_CRIT_PCT:-95}"
 BORG_REPO="${BORG_REPO:-}"
 BORG_TIMEOUT_SECONDS="${BORG_TIMEOUT_SECONDS:-20}"
 
+OUTPUT_MODE="text"
+
 WARNINGS=0
 FAILURES=0
 SKIPS=0
+
+declare -a RESULTS=()
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     C_GREEN=$'\033[32m'
@@ -49,43 +53,63 @@ else
     C_RESET=""
 fi
 
-status_line() {
-    local color="$1"
-    local label="$2"
-    shift 2
+json_escape() {
+    local value="$1"
 
-    printf '%b%-5s%b %s\n' \
-        "$color" \
-        "$label" \
-        "$C_RESET" \
-        "$*"
+    value=${value//\\/\\\\}
+    value=${value//\"/\\\"}
+    value=${value//$'\n'/\\n}
+    value=${value//$'\r'/\\r}
+    value=${value//$'\t'/\\t}
+
+    printf '%s' "$value"
 }
 
-pass() {
-    status_line "$C_GREEN" "PASS" "$*"
-}
+record_result() {
+    local status="$1"
+    local name="$2"
+    local message="$3"
+    local color=""
 
-warn() {
-    WARNINGS=$((WARNINGS + 1))
-    status_line "$C_YELLOW" "WARN" "$*"
-}
+    case "$status" in
+        PASS)
+            color="$C_GREEN"
+            ;;
+        WARN)
+            WARNINGS=$((WARNINGS + 1))
+            color="$C_YELLOW"
+            ;;
+        FAIL)
+            FAILURES=$((FAILURES + 1))
+            color="$C_RED"
+            ;;
+        SKIP)
+            SKIPS=$((SKIPS + 1))
+            color="$C_BLUE"
+            ;;
+        INFO)
+            color="$C_CYAN"
+            ;;
+    esac
 
-fail() {
-    FAILURES=$((FAILURES + 1))
-    status_line "$C_RED" "FAIL" "$*"
-}
-
-skip() {
-    SKIPS=$((SKIPS + 1))
-    status_line "$C_BLUE" "SKIP" "$*"
-}
-
-info() {
-    status_line "$C_CYAN" "INFO" "$*"
+    if [[ "$OUTPUT_MODE" == "json" ]]; then
+        RESULTS+=(
+            "{\"name\":\"$(json_escape "$name")\",\"status\":\"$(json_escape "$status")\",\"message\":\"$(json_escape "$message")\"}"
+        )
+    else
+        printf '%b%-5s%b %-18s %s\n' \
+            "$color" \
+            "$status" \
+            "$C_RESET" \
+            "$name" \
+            "$message"
+    fi
 }
 
 section() {
-    printf '\n%b== %s ==%b\n' "$C_CYAN" "$*" "$C_RESET"
+    if [[ "$OUTPUT_MODE" == "text" ]]; then
+        printf '\n%b== %s ==%b\n' "$C_CYAN" "$1" "$C_RESET"
+    fi
 }
 
 command_exists() {
@@ -116,11 +140,14 @@ ${SCRIPT_NAME} ${VERSION}
 
 Usage:
   ./scripts/homelab-health-check.sh
+  ./scripts/homelab-health-check.sh --json
   ./scripts/homelab-health-check.sh --help
   ./scripts/homelab-health-check.sh --version
 
-Purpose:
-  Performs read-only checks of common homelab infrastructure components.
+Options:
+  --json       Return machine-readable JSON output
+  --help       Show this help message
+  --version    Show script version
 
 Checks:
   - Host uptime
@@ -133,20 +160,13 @@ Checks:
   - UFW firewall
   - Borg backup repository
 
-Configuration examples:
-
-  DISK_WARN_PCT=80 ./scripts/homelab-health-check.sh
-
-  BORG_REPO=/path/to/repository \
-  ./scripts/homelab-health-check.sh
-
 Exit status:
-  0  No warnings or failures
-  1  One or more warnings
-  2  One or more failures
+  0  Healthy
+  1  Warning detected
+  2  Failure detected
 
-The script does not restart services, modify firewall rules,
-change system configuration or write to the monitored services.
+This utility is read-only and does not restart services,
+modify firewall rules or change system configuration.
 USAGE
 }
 
@@ -164,18 +184,27 @@ validate_configuration() {
         value="${!variable}"
 
         if ! is_integer "$value"; then
-            fail "Invalid configuration: ${variable} must be an integer."
+            record_result \
+                "FAIL" \
+                "Configuration" \
+                "${variable} must be an integer."
             return 1
         fi
     done
 
     if (( DISK_WARN_PCT >= DISK_CRIT_PCT )); then
-        fail "DISK_WARN_PCT must be lower than DISK_CRIT_PCT."
+        record_result \
+            "FAIL" \
+            "Configuration" \
+            "DISK_WARN_PCT must be lower than DISK_CRIT_PCT."
         return 1
     fi
 
     if (( MEM_WARN_PCT >= MEM_CRIT_PCT )); then
-        fail "MEM_WARN_PCT must be lower than MEM_CRIT_PCT."
+        record_result \
+            "FAIL" \
+            "Configuration" \
+            "MEM_WARN_PCT must be lower than MEM_CRIT_PCT."
         return 1
     fi
 
@@ -185,18 +214,14 @@ validate_configuration() {
 check_uptime() {
     section "Host"
 
-    local host
     local uptime_text
 
-    host="$(hostname -f 2>/dev/null || hostname)"
     uptime_text="$(uptime -p 2>/dev/null || true)"
 
-    info "Host: ${host}"
-
     if [[ -n "$uptime_text" ]]; then
-        pass "Uptime: ${uptime_text}"
+        record_result "PASS" "Host uptime" "$uptime_text"
     else
-        warn "Unable to determine host uptime."
+        record_result "WARN" "Host uptime" "Unable to determine uptime."
     fi
 }
 
@@ -204,39 +229,50 @@ check_docker() {
     section "Docker"
 
     if ! command_exists docker; then
-        skip "Docker CLI is not installed."
+        record_result "SKIP" "Docker" "Docker CLI is not installed."
         return
     fi
 
     if ! docker info >/dev/null 2>&1; then
-        warn "Docker daemon is unavailable or current user lacks permission."
+        record_result \
+            "WARN" \
+            "Docker" \
+            "Docker daemon unavailable or current user lacks permission."
         return
     fi
 
     local total
     local running
     local problematic
-    local exited
+    local stopped
 
     total="$(docker ps -a -q 2>/dev/null | wc -l | tr -d ' ')"
     running="$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')"
 
-    pass "Docker daemon reachable — ${running}/${total} containers running."
+    record_result \
+        "PASS" \
+        "Docker" \
+        "${running}/${total} containers running."
 
     problematic="$(
         docker ps \
-            --format '{{.Names}}\t{{.Status}}' 2>/dev/null |
+            --format '{{.Names}} {{.Status}}' 2>/dev/null |
         grep -Ei 'unhealthy|restarting|dead' || true
     )"
 
     if [[ -n "$problematic" ]]; then
-        warn "Containers require attention:"
-        printf '%s\n' "$problematic" | sed 's/^/      /'
+        record_result \
+            "WARN" \
+            "Docker health" \
+            "$problematic"
     else
-        pass "No running containers report unhealthy/restarting/dead state."
+        record_result \
+            "PASS" \
+            "Docker health" \
+            "No unhealthy, restarting or dead containers."
     fi
 
-    exited="$(
+    stopped="$(
         docker ps -a \
             --filter status=exited \
             --format '{{.Names}}' 2>/dev/null |
@@ -244,51 +280,49 @@ check_docker() {
         tr -d ' '
     )"
 
-    if (( exited > 0 )); then
-        info "${exited} container(s) are currently stopped."
-    fi
+    record_result \
+        "INFO" \
+        "Docker stopped" \
+        "${stopped} container(s) currently stopped."
 }
 
 check_systemd() {
     section "systemd"
 
     if ! command_exists systemctl; then
-        skip "systemctl is not available."
+        record_result "SKIP" "systemd" "systemctl is not available."
         return
     fi
 
     local failed_units
 
     failed_units="$(
-        systemctl --failed --no-legend --plain 2>/dev/null || true
+        systemctl --failed --no-legend --plain 2>/dev/null |
+        awk '{print $1}' |
+        paste -sd ',' - || true
     )"
 
     if [[ -z "$failed_units" ]]; then
-        pass "No failed systemd units."
+        record_result "PASS" "systemd" "No failed units."
     else
-        fail "Failed systemd units detected:"
-        printf '%s\n' "$failed_units" | sed 's/^/      /'
+        record_result \
+            "FAIL" \
+            "systemd" \
+            "Failed units: ${failed_units}"
     fi
 }
 
 check_filesystems() {
     section "Filesystems"
 
-    local disk_issues=0
-    local checked=0
     local filesystem
     local percentage
     local mountpoint
     local value
+    local checked=0
+    local issues=0
 
-    while read -r \
-        filesystem \
-        _ \
-        _ \
-        _ \
-        percentage \
-        mountpoint
-    do
+    while read -r filesystem percentage mountpoint; do
         [[ -z "${filesystem:-}" ]] && continue
 
         value="${percentage%\%}"
@@ -300,26 +334,37 @@ check_filesystems() {
         checked=$((checked + 1))
 
         if (( value >= DISK_CRIT_PCT )); then
-            fail "${mountpoint}: ${value}% used (${filesystem})"
-            disk_issues=$((disk_issues + 1))
+            record_result \
+                "FAIL" \
+                "Filesystem" \
+                "${mountpoint}: ${value}% used (${filesystem})"
+            issues=$((issues + 1))
         elif (( value >= DISK_WARN_PCT )); then
-            warn "${mountpoint}: ${value}% used (${filesystem})"
-            disk_issues=$((disk_issues + 1))
+            record_result \
+                "WARN" \
+                "Filesystem" \
+                "${mountpoint}: ${value}% used (${filesystem})"
+            issues=$((issues + 1))
         fi
-
     done < <(
         df -P \
             -x tmpfs \
             -x devtmpfs \
             -x squashfs \
             -x overlay 2>/dev/null |
-        awk 'NR > 1'
+        awk 'NR > 1 {print $1, $5, $6}'
     )
 
     if (( checked == 0 )); then
-        warn "No filesystems could be evaluated."
-    elif (( disk_issues == 0 )); then
-        pass "Filesystem utilisation below ${DISK_WARN_PCT}% warning threshold."
+        record_result \
+            "WARN" \
+            "Filesystem" \
+            "No filesystems could be evaluated."
+    elif (( issues == 0 )); then
+        record_result \
+            "PASS" \
+            "Filesystem" \
+            "All filesystems below ${DISK_WARN_PCT}% usage."
     fi
 }
 
@@ -327,7 +372,10 @@ check_memory() {
     section "Memory"
 
     if [[ ! -r /proc/meminfo ]]; then
-        skip "/proc/meminfo is unavailable."
+        record_result \
+            "SKIP" \
+            "Memory" \
+            "/proc/meminfo is unavailable."
         return
     fi
 
@@ -346,18 +394,31 @@ check_memory() {
     if ! is_integer "${total_kb:-}" ||
        ! is_integer "${available_kb:-}" ||
        (( total_kb == 0 )); then
-        warn "Unable to calculate memory utilisation."
+
+        record_result \
+            "WARN" \
+            "Memory" \
+            "Unable to calculate utilisation."
         return
     fi
 
     used_pct=$(( (total_kb - available_kb) * 100 / total_kb ))
 
     if (( used_pct >= MEM_CRIT_PCT )); then
-        fail "Memory utilisation is ${used_pct}%."
+        record_result \
+            "FAIL" \
+            "Memory" \
+            "${used_pct}% utilised."
     elif (( used_pct >= MEM_WARN_PCT )); then
-        warn "Memory utilisation is ${used_pct}%."
+        record_result \
+            "WARN" \
+            "Memory" \
+            "${used_pct}% utilised."
     else
-        pass "Memory utilisation is ${used_pct}%."
+        record_result \
+            "PASS" \
+            "Memory" \
+            "${used_pct}% utilised."
     fi
 }
 
@@ -365,7 +426,10 @@ check_raid() {
     section "Linux Software RAID"
 
     if [[ ! -r /proc/mdstat ]]; then
-        skip "/proc/mdstat is unavailable."
+        record_result \
+            "SKIP" \
+            "RAID" \
+            "/proc/mdstat is unavailable."
         return
     fi
 
@@ -377,7 +441,10 @@ check_raid() {
     )"
 
     if [[ -z "$arrays" ]]; then
-        skip "No active Linux MD RAID arrays detected."
+        record_result \
+            "SKIP" \
+            "RAID" \
+            "No active Linux MD arrays detected."
         return
     fi
 
@@ -386,18 +453,15 @@ check_raid() {
     )"
 
     if grep -q '_' <<< "$states"; then
-        fail "Degraded RAID member detected."
-
-        printf '%s\n' "$arrays" |
-            sed 's/^/      /'
-
-        printf '%s\n' "$states" |
-            sed 's/^/      State: /'
+        record_result \
+            "FAIL" \
+            "RAID" \
+            "Degraded RAID member detected."
     else
-        pass "Active RAID arrays report all expected members online."
-
-        printf '%s\n' "$arrays" |
-            sed 's/^/      /'
+        record_result \
+            "PASS" \
+            "RAID" \
+            "All expected RAID members online."
     fi
 }
 
@@ -405,7 +469,10 @@ check_wireguard() {
     section "WireGuard"
 
     if ! command_exists wg; then
-        skip "WireGuard tools are not installed."
+        record_result \
+            "SKIP" \
+            "WireGuard" \
+            "WireGuard tools are not installed."
         return
     fi
 
@@ -418,17 +485,26 @@ check_wireguard() {
     result=$?
 
     if (( result == 77 )); then
-        skip "WireGuard requires privileged access; non-interactive sudo unavailable."
+        record_result \
+            "SKIP" \
+            "WireGuard" \
+            "Privileged access unavailable."
         return
     fi
 
     if (( result != 0 )); then
-        warn "Unable to query WireGuard state."
+        record_result \
+            "WARN" \
+            "WireGuard" \
+            "Unable to query state."
         return
     fi
 
     if [[ -z "$output" ]]; then
-        skip "No active WireGuard interfaces detected."
+        record_result \
+            "SKIP" \
+            "WireGuard" \
+            "No active interfaces detected."
         return
     fi
 
@@ -441,14 +517,20 @@ check_wireguard() {
         grep -c '^peer:' <<< "$output" || true
     )"
 
-    pass "Active interface(s): ${interfaces}; peer(s): ${peer_count}."
+    record_result \
+        "PASS" \
+        "WireGuard" \
+        "Interfaces: ${interfaces}; peers: ${peer_count}."
 }
 
 check_ufw() {
     section "UFW Firewall"
 
     if ! command_exists ufw; then
-        skip "UFW is not installed."
+        record_result \
+            "SKIP" \
+            "UFW" \
+            "UFW is not installed."
         return
     fi
 
@@ -459,19 +541,31 @@ check_ufw() {
     result=$?
 
     if (( result == 77 )); then
-        skip "UFW requires privileged access; non-interactive sudo unavailable."
+        record_result \
+            "SKIP" \
+            "UFW" \
+            "Privileged access unavailable."
         return
     fi
 
     if (( result != 0 )); then
-        warn "Unable to query UFW status."
+        record_result \
+            "WARN" \
+            "UFW" \
+            "Unable to query firewall status."
         return
     fi
 
     if grep -q '^Status: active' <<< "$output"; then
-        pass "UFW firewall is active."
+        record_result \
+            "PASS" \
+            "UFW" \
+            "Firewall is active."
     else
-        warn "UFW firewall is not active."
+        record_result \
+            "WARN" \
+            "UFW" \
+            "Firewall is not active."
     fi
 }
 
@@ -479,19 +573,24 @@ check_borg() {
     section "Borg Backup"
 
     if ! command_exists borg; then
-        skip "Borg Backup is not installed."
+        record_result \
+            "SKIP" \
+            "Borg" \
+            "Borg Backup is not installed."
         return
     fi
 
     if [[ -z "$BORG_REPO" ]]; then
-        skip "BORG_REPO is not configured."
-        info "Set BORG_REPO to enable repository validation."
+        record_result \
+            "SKIP" \
+            "Borg" \
+            "BORG_REPO is not configured."
         return
     fi
 
     local output
     local result
-    local borg_command
+    local -a borg_command
 
     borg_command=(
         borg
@@ -509,7 +608,6 @@ check_borg() {
                 "${BORG_TIMEOUT_SECONDS}s" \
                 "${borg_command[@]}" 2>/dev/null
         )"
-
         result=$?
     else
         output="$("${borg_command[@]}" 2>/dev/null)"
@@ -517,35 +615,98 @@ check_borg() {
     fi
 
     if (( result == 0 )) && [[ -n "$output" ]]; then
-        pass "Repository accessible. Latest archive: $(head -n 1 <<< "$output")"
+        record_result \
+            "PASS" \
+            "Borg" \
+            "Latest archive: $(head -n 1 <<< "$output")"
     elif (( result == 124 )); then
-        warn "Borg repository check timed out after ${BORG_TIMEOUT_SECONDS}s."
+        record_result \
+            "WARN" \
+            "Borg" \
+            "Repository check timed out."
     else
-        warn "Borg repository could not be validated non-interactively."
+        record_result \
+            "WARN" \
+            "Borg" \
+            "Repository could not be validated."
     fi
 }
 
-print_summary() {
+overall_status() {
+    if (( FAILURES > 0 )); then
+        printf 'critical'
+    elif (( WARNINGS > 0 )); then
+        printf 'warning'
+    else
+        printf 'healthy'
+    fi
+}
+
+print_text_summary() {
     section "Summary"
 
     printf 'Warnings : %d\n' "$WARNINGS"
     printf 'Failures : %d\n' "$FAILURES"
     printf 'Skipped  : %d\n' "$SKIPS"
 
-    if (( FAILURES > 0 )); then
-        status_line "$C_RED" "FAIL" \
-            "Health check completed with critical findings."
-    elif (( WARNINGS > 0 )); then
-        status_line "$C_YELLOW" "WARN" \
-            "Health check completed with warnings."
-    else
-        status_line "$C_GREEN" "PASS" \
-            "Health check completed successfully."
-    fi
+    case "$(overall_status)" in
+        critical)
+            printf '%bFAIL%b  Health check completed with critical findings.\n' \
+                "$C_RED" "$C_RESET"
+            ;;
+        warning)
+            printf '%bWARN%b  Health check completed with warnings.\n' \
+                "$C_YELLOW" "$C_RESET"
+            ;;
+        healthy)
+            printf '%bPASS%b  Health check completed successfully.\n' \
+                "$C_GREEN" "$C_RESET"
+            ;;
+    esac
+}
+
+print_json() {
+    local timestamp
+    local host
+    local status
+    local index
+
+    timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    host="$(hostname -f 2>/dev/null || hostname)"
+    status="$(overall_status)"
+
+    printf '{\n'
+    printf '  "tool": "%s",\n' "$(json_escape "$SCRIPT_NAME")"
+    printf '  "version": "%s",\n' "$(json_escape "$VERSION")"
+    printf '  "timestamp": "%s",\n' "$(json_escape "$timestamp")"
+    printf '  "host": "%s",\n' "$(json_escape "$host")"
+    printf '  "status": "%s",\n' "$(json_escape "$status")"
+    printf '  "summary": {\n'
+    printf '    "warnings": %d,\n' "$WARNINGS"
+    printf '    "failures": %d,\n' "$FAILURES"
+    printf '    "skipped": %d\n' "$SKIPS"
+    printf '  },\n'
+    printf '  "checks": [\n'
+
+    for index in "${!RESULTS[@]}"; do
+        printf '    %s' "${RESULTS[$index]}"
+
+        if (( index < ${#RESULTS[@]} - 1 )); then
+            printf ','
+        fi
+
+        printf '\n'
+    done
+
+    printf '  ]\n'
+    printf '}\n'
 }
 
 main() {
     case "${1:-}" in
+        --json)
+            OUTPUT_MODE="json"
+            ;;
         --help|-h)
             usage
             return 0
@@ -563,16 +724,22 @@ main() {
             ;;
     esac
 
-    printf '%b%s %s%b\n' \
-        "$C_CYAN" \
-        "$SCRIPT_NAME" \
-        "$VERSION" \
-        "$C_RESET"
+    if [[ "$OUTPUT_MODE" == "text" ]]; then
+        printf '%b%s %s%b\n' \
+            "$C_CYAN" \
+            "$SCRIPT_NAME" \
+            "$VERSION" \
+            "$C_RESET"
 
-    printf 'Read-only infrastructure health assessment\n'
+        printf 'Read-only infrastructure health assessment\n'
+    fi
 
     if ! validate_configuration; then
-        print_summary
+        if [[ "$OUTPUT_MODE" == "json" ]]; then
+            print_json
+        else
+            print_text_summary
+        fi
         return 2
     fi
 
@@ -586,7 +753,11 @@ main() {
     check_ufw
     check_borg
 
-    print_summary
+    if [[ "$OUTPUT_MODE" == "json" ]]; then
+        print_json
+    else
+        print_text_summary
+    fi
 
     if (( FAILURES > 0 )); then
         return 2

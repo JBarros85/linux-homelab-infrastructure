@@ -420,6 +420,14 @@ Optional Borg validation:
 BORG_REPO=/path/to/repository ./scripts/homelab-health-check.sh
 ```
 
+Machine-readable JSON output:
+
+```bash
+./scripts/homelab-health-check.sh --json
+```
+
+The JSON output can be consumed by monitoring tools, automation scripts, dashboards or external integrations.
+
 Exit status:
 
 | Code | Meaning |
