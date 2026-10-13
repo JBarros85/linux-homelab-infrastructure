@@ -57,6 +57,7 @@ For the complete architecture diagram, see:
 | Networking | [Networking](docs/networking.md) |
 | Storage | [Storage Architecture](docs/storage.md) |
 | Backup | [Backup Strategy](docs/backup-strategy.md) |
+| Restore Testing | [Backup Restore Testing](docs/backup-restore-testing.md) |
 | Maintenance | [Maintenance Checklist](docs/maintenance-checklist.md) |
 
 <!-- PORTFOLIO_OVERVIEW_END -->
