@@ -57,6 +57,7 @@ For the complete architecture diagram, see:
 | Networking | [Networking](docs/networking.md) |
 | [Network Exposure Policy](docs/network-exposure-policy.md) | Firewall boundaries, public services and trusted access |
 | Storage | [Storage Architecture](docs/storage.md) |
+| [Storage Health Monitoring](docs/storage-health-monitoring.md) | RAID1, SMART and disk health verification |
 | Backup | [Backup Strategy](docs/backup-strategy.md) |
 | Restore Testing | [Backup Restore Testing](docs/backup-restore-testing.md) |
 | Maintenance | [Maintenance Checklist](docs/maintenance-checklist.md) |
