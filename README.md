@@ -54,6 +54,7 @@ For the complete architecture diagram, see:
 |---|---|
 | Architecture | [Architecture](docs/architecture.md) |
 | Security | [Security Architecture](docs/security.md) |
+| [Docker Secrets Management](docs/docker-secrets-management.md) | Secret separation, Git protection and credential rotation |
 | Networking | [Networking](docs/networking.md) |
 | [Network Exposure Policy](docs/network-exposure-policy.md) | Firewall boundaries, public services and trusted access |
 | Storage | [Storage Architecture](docs/storage.md) |
