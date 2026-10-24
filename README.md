@@ -60,6 +60,7 @@ For the complete architecture diagram, see:
 | Storage | [Storage Architecture](docs/storage.md) |
 | [Storage Health Monitoring](docs/storage-health-monitoring.md) | RAID1, SMART and disk health verification |
 | Backup | [Backup Strategy](docs/backup-strategy.md) |
+| [Borg systemd Automation](docs/borg-systemd-automation.md) | Daily backups, weekly repository checks and service monitoring |
 | Restore Testing | [Backup Restore Testing](docs/backup-restore-testing.md) |
 | Maintenance | [Maintenance Checklist](docs/maintenance-checklist.md) |
 
