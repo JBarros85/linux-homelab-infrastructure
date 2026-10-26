@@ -57,6 +57,7 @@ For the complete architecture diagram, see:
 | [Docker Secrets Management](docs/docker-secrets-management.md) | Secret separation, Git protection and credential rotation |
 | Networking | [Networking](docs/networking.md) |
 | [Network Exposure Policy](docs/network-exposure-policy.md) | Firewall boundaries, public services and trusted access |
+| [SSH & Fail2ban Hardening](docs/ssh-fail2ban-hardening.md) | Layered SSH access protection and automated blocking of repeated failures |
 | Storage | [Storage Architecture](docs/storage.md) |
 | [Storage Health Monitoring](docs/storage-health-monitoring.md) | RAID1, SMART and disk health verification |
 | [Health Reporting & Alerting](docs/health-reporting-alerting.md) | Weekly and monthly health reports with proactive infrastructure alerts |
