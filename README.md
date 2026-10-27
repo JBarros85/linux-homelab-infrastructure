@@ -60,6 +60,7 @@ For the complete architecture diagram, see:
 | [SSH & Fail2ban Hardening](docs/ssh-fail2ban-hardening.md) | Layered SSH access protection and automated blocking of repeated failures |
 | Storage | [Storage Architecture](docs/storage.md) |
 | [Storage Health Monitoring](docs/storage-health-monitoring.md) | RAID1, SMART and disk health verification |
+| [Storage Monitoring Automation](docs/storage-monitoring-automation.md) | Automated RAID and SMART monitoring with systemd and smartd |
 | [Health Reporting & Alerting](docs/health-reporting-alerting.md) | Weekly and monthly health reports with proactive infrastructure alerts |
 | Backup | [Backup Strategy](docs/backup-strategy.md) |
 | [Borg systemd Automation](docs/borg-systemd-automation.md) | Daily backups, weekly repository checks and service monitoring |
