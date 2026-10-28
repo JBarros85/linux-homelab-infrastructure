@@ -55,6 +55,7 @@ For the complete architecture diagram, see:
 | Architecture | [Architecture](docs/architecture.md) |
 | Security | [Security Architecture](docs/security.md) |
 | [Docker Secrets Management](docs/docker-secrets-management.md) | Secret separation, Git protection and credential rotation |
+| [Docker Health Checks & Restart Policies](docs/docker-healthchecks-restart-policies.md) | Application-level container health monitoring and restart behavior |
 | Networking | [Networking](docs/networking.md) |
 | [Network Exposure Policy](docs/network-exposure-policy.md) | Firewall boundaries, public services and trusted access |
 | [SSH & Fail2ban Hardening](docs/ssh-fail2ban-hardening.md) | Layered SSH access protection and automated blocking of repeated failures |
