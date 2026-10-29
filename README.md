@@ -58,6 +58,7 @@ For the complete architecture diagram, see:
 | [Docker Health Checks & Restart Policies](docs/docker-healthchecks-restart-policies.md) | Application-level container health monitoring and restart behavior |
 | Networking | [Networking](docs/networking.md) |
 | [Network Exposure Policy](docs/network-exposure-policy.md) | Firewall boundaries, public services and trusted access |
+| [Reverse Proxy & TLS](docs/reverse-proxy-tls.md) | Nginx Proxy Manager ingress, TLS termination, SNI and certificate handling |
 | [SSH & Fail2ban Hardening](docs/ssh-fail2ban-hardening.md) | Layered SSH access protection and automated blocking of repeated failures |
 | Storage | [Storage Architecture](docs/storage.md) |
 | [Storage Health Monitoring](docs/storage-health-monitoring.md) | RAID1, SMART and disk health verification |
