@@ -447,3 +447,7 @@ Exit status:
 | `2` | Failure detected |
 
 <!-- HEALTH_CHECK_END -->
+
+## System Maintenance
+
+- [Ubuntu Patch Management and Reboot Readiness](docs/ubuntu-patch-management.md)
