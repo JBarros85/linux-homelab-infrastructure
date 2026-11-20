@@ -451,3 +451,5 @@ Exit status:
 ## System Maintenance
 
 - [Ubuntu Patch Management and Reboot Readiness](docs/ubuntu-patch-management.md)
+
+- [Public Portfolio Security Review](docs/public-portfolio-security-audit.md)
